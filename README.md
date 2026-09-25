@@ -122,6 +122,23 @@ Summarised here, detailed in [docs/methodology.md](docs/methodology.md):
   detection is out of reach;
 - **below the publication thresholds, nothing appears at all**.
 
+## Roadmap
+
+- [x] Collect the new simap platform (from 2026), link winners to Zefix, rank them
+- [ ] Go back to 1 July 2024, the start of the new platform
+- [ ] Daily incremental collection
+- [ ] **Export to the [Open Contracting Data Standard](https://standard.open-contracting.org/)
+      (OCDS).** Mapping simap publications to OCDS releases would make Swiss data
+      comparable with other countries' and let existing tools run on it
+      unchanged — first of all [Cardinal](https://github.com/open-contracting/cardinal-rs),
+      which computes red flags from the OCP guide
+- [ ] Risk indicators, each mapped to the red flag of the OCP guide it
+      implements, calibrated on documented cases before publication
+- [ ] Members of bidding consortia, extracted from the free-text notes
+- [ ] The 2007–2024 archive (archiv.simap.ch), matched to the register by name
+      and address for lack of a UID
+- [ ] Cross-check with the federal list of contracts of CHF 50,000 and more
+
 ## Related work
 
 - **[Red Flags in Public Procurement](https://www.open-contracting.org/resources/red-flags-in-public-procurement-a-guide-to-using-data-to-detect-and-mitigate-risks/)**
