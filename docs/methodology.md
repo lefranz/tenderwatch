@@ -66,8 +66,8 @@ authority's awards that goes to the same company.
 - Open Contracting Partnership, *[Red Flags in Public Procurement. A guide to
   using data to detect and mitigate risks](https://www.open-contracting.org/resources/red-flags-in-public-procurement-a-guide-to-using-data-to-detect-and-mitigate-risks/)*,
   2024 ([PDF](https://www.open-contracting.org/wp-content/uploads/2024/12/OCP2024-RedFlagProcurement-1.pdf)).
-  73 indicators with formulas over OCDS data. Many of them need data simap does
-  not publish (losing bids, estimated value, contract amendments); each
+  73 indicators with formulas over OCDS data. Some need data simap does not
+  publish (losing bids, estimated value, contract amendments); each
   TenderWatch indicator will state which red flag of the guide it implements,
   and why others are out of reach.
 - [Cardinal](https://github.com/open-contracting/cardinal-rs), OCP's
