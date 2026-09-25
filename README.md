@@ -55,9 +55,8 @@ The database is reached through a libpq connection string in
 
 Linking winners to the commercial register needs access to the **Zefix
 PublicREST API**, run by the Federal Registry of Commerce (FRC). Access is free
-but personal: request a username and password from the FRC, stating your
-intended use — third-party documentation gives the address
-`zefix@bj.admin.ch`. The API is documented on its
+but personal: request a username and password by email to
+**`zefix@bj.admin.ch`**, stating your intended use. The API is documented on its
 [Swagger page](https://www.zefix.admin.ch/ZefixPublicREST/swagger-ui/index.html).
 
 Credentials are read **from the environment only**, never from the command line
