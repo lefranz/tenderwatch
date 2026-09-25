@@ -124,6 +124,18 @@ Summarised here, detailed in [docs/methodology.md](docs/methodology.md):
 
 ## Related work
 
+- **[Red Flags in Public Procurement](https://www.open-contracting.org/resources/red-flags-in-public-procurement-a-guide-to-using-data-to-detect-and-mitigate-risks/)**
+  (Open Contracting Partnership, 2024): the reference guide for data-driven risk
+  indicators — 73 red flags across the procurement cycle, with definitions and
+  formulas mapped to the Open Contracting Data Standard (OCDS). TenderWatch's
+  indicators will start from this list.
+- **[Cardinal](https://github.com/open-contracting/cardinal-rs)** (Open
+  Contracting Partnership): open-source library that computes some of these red
+  flags on OCDS data.
+- **[Government Transparency Institute](https://www.govtransparency.eu)** and
+  **[opentender.eu](https://opentender.eu)**: academic work led by Mihály
+  Fazekas on procurement corruption-risk indicators, and their application to
+  European procurement data.
 - **[IntelliProcure](https://intelliprocure.ch/)** (Bern University of Applied
   Sciences): simap since 2009 including tender documents, full-text search; free
   accounts for journalists.
