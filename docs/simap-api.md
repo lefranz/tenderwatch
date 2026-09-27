@@ -28,6 +28,7 @@ answer **without a token**:
 | `GET /api/publications/v1/project/{projectId}/publication-details/{publicationId}` | full detail: dates, criteria, decision, winners, prices |
 | `GET /api/publications/v2/project/{projectId}/project-header` | project header, lots, latest publication |
 | `GET /api/vendors/v1/vendor/{vendorId}/public` | vendor profile, including `uidNo` |
+| `GET /api/procoffices/v1/po/public` | all contracting authorities (~5,000) in one call, with their `type`: `central_federation`, `decentral_federation`, `other_federation`, `cantonal`, `other_cantonal`, `communal`, `other_communal`, `foreign` |
 
 Tender documents require a vendor account (`/api/vendors/v1/my/...`).
 

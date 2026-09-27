@@ -1,11 +1,12 @@
 """Collect simap.ch publications into the database.
 
-Four steps, each resumable (whatever is already stored is skipped):
+Five steps, each resumable (whatever is already stored is skipped):
 
 1. ``search``  — projects whose newest publication falls in the window, month by month;
 2. ``history`` — past publications of each project, lot by lot;
 3. ``details`` — raw detail of every publication;
-4. ``vendors`` — public profile of every award winner (carries the UID).
+4. ``vendors`` — public profile of every award winner (carries the UID);
+5. ``offices`` — every contracting authority and its type, in one call.
 """
 from __future__ import annotations
 
@@ -180,3 +181,19 @@ def step_vendors(conn, client: Client):
         if i % 500 == 0:
             log.info("vendors: %d/%d", i, len(todo))
     log.info("vendors done, %d calls", client.calls)
+
+
+def step_offices(conn, client: Client):
+    # The whole list in one call, read again every time: a new authority shows
+    # up there before its first publication.
+    offices = client.proc_offices()
+    with conn.cursor() as cur:
+        for o in offices:
+            cur.execute("""INSERT INTO proc_offices (id, type, name, institution_id, detail)
+                           VALUES (%s, %s, %s, %s, %s)
+                           ON CONFLICT (id) DO UPDATE SET type = EXCLUDED.type, name = EXCLUDED.name,
+                               institution_id = EXCLUDED.institution_id, detail = EXCLUDED.detail,
+                               last_seen = now()""",
+                        (o["id"], o.get("type"), o.get("name"), o.get("institutionId"), json.dumps(o)))
+    conn.commit()
+    log.info("contracting authorities: %d", len(offices))

@@ -100,3 +100,7 @@ class Client:
 
     def vendor_public(self, vendor_id: str):
         return self.get(f"/vendors/v1/vendor/{vendor_id}/public")
+
+    def proc_offices(self):
+        """All contracting authorities with their type (federal, cantonal, communal…). One call."""
+        return self.get("/procoffices/v1/po/public").get("procOffices") or []

@@ -79,7 +79,7 @@ Collection from simap needs no credentials.
 # 1. Collect — every step is resumable, whatever is stored is skipped
 venv/bin/tenderwatch collect all --from 2026-01-01 --to 2026-09-30
 #    = search (projects, month by month) → history (past publications)
-#      → details (raw detail) → vendors (profiles, UID)
+#      → details (raw detail) → vendors (profiles, UID) → offices (authorities)
 
 # 2. Link winners to the commercial register
 venv/bin/tenderwatch zefix
@@ -87,6 +87,8 @@ venv/bin/tenderwatch zefix
 # 3. Rank
 venv/bin/tenderwatch ranking                                 # current year, top 50 by number of awards
 venv/bin/tenderwatch ranking --order amount --top 100 --csv ranking.csv
+venv/bin/tenderwatch ranking --canton GE                     # authorities of Geneva (CH = federal)
+venv/bin/tenderwatch ranking --by-canton                     # one row per canton
 ```
 
 Pace: about 3 calls per second (`--interval 0.35`). A full year is roughly
@@ -106,7 +108,8 @@ never requires downloading again.
 | `publication_history` | replaced versions: an edited publication is never overwritten |
 | `vendors` | public profiles of winners, including the normalised UID |
 | `zefix_companies` | Zefix record per UID |
-| `v_awards` | one row per (award, winner) |
+| `proc_offices` | contracting authorities listed by simap, with their type (federal, cantonal, communal…) |
+| `v_awards` | one row per (award, winner), with `jurisdiction`: `CH` or the authority's canton |
 | `v_awards_current` | same, without earlier versions of a corrected award |
 
 ## Limits — read before publishing a figure

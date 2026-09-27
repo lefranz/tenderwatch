@@ -4,6 +4,8 @@
     tenderwatch collect all --from 2026-01-01 --to 2026-09-30
     tenderwatch zefix
     tenderwatch ranking --order amount --top 100 --csv ranking.csv
+    tenderwatch ranking --canton GE        # authorities of Geneva (CH = federal)
+    tenderwatch ranking --by-canton        # one row per canton
 """
 from __future__ import annotations
 
@@ -25,7 +27,7 @@ def main(argv=None):
     sub.add_parser("init-db", help="create tables and views (idempotent)")
 
     c = sub.add_parser("collect", help="download from simap.ch")
-    c.add_argument("step", choices=["search", "history", "details", "vendors", "all"])
+    c.add_argument("step", choices=["search", "history", "details", "vendors", "offices", "all"])
     c.add_argument("--from", dest="date_from", type=dt.date.fromisoformat)
     c.add_argument("--to", dest="date_to", type=dt.date.fromisoformat, default=dt.date.today())
     c.add_argument("--limit", type=int, help="details: at most N publications")
@@ -40,6 +42,8 @@ def main(argv=None):
     r.add_argument("--order", choices=list(ranking.ORDERS), default="count")
     r.add_argument("--top", type=int, default=50)
     r.add_argument("--csv", help="also write the ranking to this CSV file")
+    r.add_argument("--canton", type=str.upper, help="authorities of this canton (CH = federal)")
+    r.add_argument("--by-canton", action="store_true", help="one row per canton of the contracting authority")
 
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(asctime)s %(levelname)s %(message)s")
@@ -59,18 +63,30 @@ def main(argv=None):
             collect.step_details(conn, client, args.limit)
         if args.step in ("vendors", "all"):
             collect.step_vendors(conn, client)
+        if args.step in ("offices", "all"):
+            collect.step_offices(conn, client)
     elif args.command == "zefix":
         if zefix.enrich(conn, retry=args.retry):
             return 1
     elif args.command == "ranking":
-        quality, rows = ranking.ranking(conn, args.date_from, args.date_to, args.order, args.top)
+        if args.canton and args.by_canton:
+            ap.error("--canton and --by-canton are mutually exclusive")
+        if args.by_canton:
+            rows = ranking.by_canton(conn, args.date_from, args.date_to)
+            columns = ranking.CANTON_COLUMNS
+        else:
+            quality, rows = ranking.ranking(conn, args.date_from, args.date_to, args.order, args.top, args.canton)
+            columns = ranking.COLUMNS
         if args.csv:
             with open(args.csv, "w", newline="") as f:
-                w = csv.DictWriter(f, fieldnames=list(rows[0]) if rows else ranking.COLUMNS)
+                w = csv.DictWriter(f, fieldnames=list(rows[0]) if rows else columns)
                 w.writeheader()
                 w.writerows(rows)
             print(f"{len(rows)} rows → {args.csv}", file=sys.stderr)
-        print(ranking.to_markdown(quality, rows, args.date_from, args.date_to, args.order))
+        if args.by_canton:
+            print(ranking.canton_markdown(rows, args.date_from, args.date_to))
+        else:
+            print(ranking.to_markdown(quality, rows, args.date_from, args.date_to, args.order, args.canton))
     return 0
 
 

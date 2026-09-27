@@ -71,6 +71,21 @@ CREATE TABLE IF NOT EXISTS zefix_companies (
     error       TEXT                -- 'not_found': UID not in the register (association, public body, foreign…)
 );
 
+-- Contracting authority ("proc office") as listed by simap, with its type:
+-- central_federation, decentral_federation, other_federation, cantonal,
+-- other_cantonal, communal, other_communal, foreign. It is the only place that
+-- tells the Confederation from a canton: a federal office's address is almost
+-- always in Bern. An office that disappears from the list is not deleted.
+CREATE TABLE IF NOT EXISTS proc_offices (
+    id              UUID PRIMARY KEY,
+    type            TEXT,
+    name            TEXT,
+    institution_id  UUID,
+    detail          JSONB NOT NULL,
+    first_seen      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Multilingual simap text {de,fr,it,en} → one value: the first language
 -- filled in, French first. Publications are often filled in only in their
 -- creation language, in which case this returns the original text.
@@ -86,7 +101,10 @@ $$;
 --   * the price is the *published* price: VAT included or not depending on
 --     vat_type, and sometimes a framework-agreement ceiling rather than spending;
 --   * a corrected award appears several times: v_awards_current keeps only the
---     latest publication of each lot.
+--     latest publication of each lot;
+--   * proc_office_canton is the authority's address: BE for almost the whole
+--     Confederation. `jurisdiction` is 'CH' for a federal authority, its canton
+--     for a cantonal or communal one, NULL if foreign or unknown.
 CREATE OR REPLACE VIEW v_awards AS
 SELECT
     p.id                                            AS publication_id,
@@ -115,11 +133,17 @@ SELECT
     v->'price'->>'currency'                         AS currency,
     v->'price'->>'vatType'                          AS vat_type,
     ml(v->'note')                                   AS vendor_note,
-    vd.uid
+    vd.uid,
+    po.type                                         AS proc_office_type,
+    CASE WHEN po.type LIKE '%federation' THEN 'CH'
+         WHEN po.type LIKE '%cantonal' OR po.type LIKE '%communal'
+         THEN p.detail->'project-info'->'procOfficeAddress'->>'cantonId'
+    END                                             AS jurisdiction
 FROM publications p
 JOIN projects pr ON pr.id = p.project_id
 CROSS JOIN LATERAL jsonb_array_elements(COALESCE(p.detail->'decision'->'vendors', '[]'::jsonb)) v
 LEFT JOIN vendors vd ON vd.id = (v->>'vendorId')::uuid
+LEFT JOIN proc_offices po ON po.id = (p.detail->'base'->>'procOfficeId')::uuid
 WHERE p.detail IS NOT NULL
   AND p.pub_type IN ('award', 'direct_award');
 

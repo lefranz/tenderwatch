@@ -41,6 +41,21 @@ amount (`amount`) or number of distinct contracting authorities
 (`authorities`). For each winner it also shows how many awards were direct
 awards and how many received a single bid.
 
+`--canton XX` restricts it to the contracting authorities of one canton, and
+`--by-canton` gives one row per canton: awards, authorities, winners, share won
+by a company of the same canton, share of single bids, share of direct awards.
+
+The canton is the **contracting authority's jurisdiction**, not its address.
+Almost every federal office has an address in Bern: on 2026 data, 995 of the
+1,836 awards by an authority located in the canton of Bern were federal. The
+jurisdiction therefore comes from the type simap gives each authority
+(`/procoffices/v1/po/public`): cantonal and communal authorities count for
+their canton, federal ones stand apart as `CH`, foreign ones are left out.
+
+Shares by canton describe **what is published**. A canton that diligently
+publishes its direct awards shows more of them than one that does not, without
+awarding more. Compare like with like before reading anything into a gap.
+
 A raw ranking mostly surfaces large construction firms: by count, those who win
 many lots; by amount, those who win large works and framework agreements. This
 is expected and says little on its own. More telling, and the first planned
