@@ -22,7 +22,17 @@
   (`v_awards_current`). A contract in three lots won entirely counts three.
 - **One company** = one UID. Several simap profiles with the same UID are merged.
   Without a UID (foreign vendors, rare cases), the simap profile stands alone.
-- **Published amount** = sum of the prices published for the winner, in CHF.
+- **Published amount** = sum of the prices published for the winner, in CHF,
+  excluding shared amounts.
+- **Shared amount** = a price that appears more than once within the same
+  project, for several winners or several lots. A framework agreement with
+  several suppliers typically publishes its total volume, "all lots combined",
+  next to every winner of every lot; no structured field says so. Summing it
+  per winner multiplies it by the number of winners and lots: on 2026 data, 104
+  projects add up to CHF 6.6 billion counted naively, 0.88 billion once each
+  amount is counted once. Such an amount is therefore reported apart, once per
+  project (`shared_amount_chf`, with `shared_amount_projects`). It is an envelope
+  the winner may draw on, not what it obtained.
 
 ## Ranking
 
@@ -43,7 +53,8 @@ authority's awards that goes to the same company.
   in free text only. A contract won by three firms counts for the lead alone.
 - **Prices.** The published price may include VAT (`vat_type = full`) or not
   (`no_vat`); the amount excluding VAT is sometimes only in the free-text note. It
-  may be a framework-agreement ceiling rather than actual spending. Totals are
+  may be a framework-agreement ceiling rather than actual spending, or a unit
+  price (CHF 1, 3 cents per kWh). Totals are
   orders of magnitude, not accounts.
 - **Corporate groups** are not consolidated: a parent and its subsidiaries are
   distinct UIDs.

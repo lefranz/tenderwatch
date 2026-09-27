@@ -116,7 +116,8 @@ Summarised here, detailed in [docs/methodology.md](docs/methodology.md):
 - members of a **bidding consortium** are only named in free text: only the lead
   vendor is counted;
 - the **price is the published price** — VAT included or not, sometimes a
-  framework-agreement ceiling: totals are orders of magnitude;
+  framework-agreement ceiling: totals are orders of magnitude; an amount
+  repeated across the winners or lots of a project is reported apart, once;
 - **corporate groups are not consolidated**;
 - **losing bidders and their prices are never published**, so bid-rigging
   detection is out of reach;
