@@ -19,7 +19,8 @@
 
 - **One award** = the latest award publication (`award` or `direct_award`) of a
   (project, lot). Earlier versions of a corrected award are dropped
-  (`v_awards_current`). A contract in three lots won entirely counts three.
+  (`v_awards_current`). A contract in three lots won entirely counts three;
+  **one project** counts it once.
 - **One company** = one UID. Several simap profiles with the same UID are merged.
   Without a UID (foreign vendors, rare cases), the simap profile stands alone.
 - **Published amount** = sum of the prices published for the winner, in CHF,
@@ -73,7 +74,11 @@ authority's awards that goes to the same company.
   orders of magnitude, not accounts.
 - **Corporate groups** are not consolidated: a parent and its subsidiaries are
   distinct UIDs.
-- **Lots** count one award each.
+- **Lots** count one award each: a framework agreement in 8 lots is worth 8
+  awards to each of its winners. The `projects` column counts projects, and
+  `--order projects` ranks on it.
+- **A price published as 0 means "confidential"**, not free. The view turns it
+  into NULL and flags it with `price_zero`: 203 winner rows in 2026.
 - **Losing bidders and their prices are never published.** Detecting collusion
   between bidders (bid rotation, cover bids, price patterns) requires all bids;
   only the competition authority has them.

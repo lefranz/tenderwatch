@@ -1,7 +1,8 @@
 """Ranking of the companies that win the most public contracts.
 
 Unit of count: one award = the latest award publication of a (project, lot).
-A contract split into 3 lots and won entirely counts 3. One company = one UID
+A contract split into 3 lots and won entirely counts 3; `projects` counts
+projects, where it counts 1. One company = one UID
 (several simap profiles with the same UID are merged); without a UID, the simap
 profile.
 
@@ -10,6 +11,8 @@ several winners or several lots) is a common envelope, typically the volume of
 a framework agreement "all lots combined", not what each winner obtained. It is
 taken out of `published_amount_chf`, counted once per project in
 `shared_amount_chf`, and `shared_amount_projects` says how many projects.
+
+A price published as 0 means "confidential": it is counted as without price.
 
 Canton: the contracting authority's (`jurisdiction`), not the company's.
 Cantons only group cantonal and communal authorities; the Confederation stands
@@ -44,6 +47,7 @@ SELECT
     COALESCE(max(z.canton), max(a.vendor_canton))           AS canton,
     max(z.status)                                           AS register_status,
     count(DISTINCT a.publication_id)                        AS awards,
+    count(DISTINCT a.project_id)                            AS projects,
     count(DISTINCT a.proc_office_id)                        AS contracting_authorities,
     round(sum(a.price) FILTER (WHERE a.currency = 'chf' AND NOT a.shared)) AS published_amount_chf,
     max(s.projects)                                         AS shared_amount_projects,
@@ -70,6 +74,7 @@ SELECT count(DISTINCT publication_id)                                    AS awar
        count(*)                                                          AS winner_rows,
        count(*) FILTER (WHERE uid IS NOT NULL)                           AS with_uid,
        count(*) FILTER (WHERE price IS NULL)                             AS without_price,
+       count(*) FILTER (WHERE price_zero)                                AS price_zero,
        count(*) FILTER (WHERE vat_type = 'full')                         AS price_incl_vat,
        count(*) FILTER (WHERE vat_type = 'no_vat')                       AS price_excl_vat,
        count(*) FILTER (WHERE currency IS NOT NULL AND currency <> 'chf') AS other_currency,
@@ -91,6 +96,7 @@ WITH a AS (
 SELECT
     jurisdiction                                            AS canton,
     count(DISTINCT publication_id)                          AS awards,
+    count(DISTINCT project_id)                              AS projects,
     count(DISTINCT proc_office_id)                          AS contracting_authorities,
     count(DISTINCT key)                                     AS winners,
     CASE WHEN jurisdiction <> 'CH' THEN round(100.0 * count(*) FILTER (WHERE winner_canton = jurisdiction)
@@ -103,11 +109,11 @@ FROM a
 GROUP BY 1
 ORDER BY awards DESC
 """
-CANTON_COLUMNS = ["canton", "awards", "contracting_authorities", "winners", "pct_winner_same_canton",
+CANTON_COLUMNS = ["canton", "awards", "projects", "contracting_authorities", "winners", "pct_winner_same_canton",
                   "pct_single_bid", "pct_direct_award"]
 
-ORDERS = {"count": "awards", "amount": "published_amount_chf", "authorities": "contracting_authorities"}
-COLUMNS = ["company", "uid", "canton", "register_status", "awards", "contracting_authorities",
+ORDERS = {"count": "awards", "projects": "projects", "amount": "published_amount_chf", "authorities": "contracting_authorities"}
+COLUMNS = ["company", "uid", "canton", "register_status", "awards", "projects", "contracting_authorities",
            "published_amount_chf", "shared_amount_projects", "shared_amount_chf", "direct_awards", "single_bid"]
 AMOUNTS = {"published_amount_chf", "shared_amount_chf"}
 
@@ -142,7 +148,8 @@ def to_markdown(quality: dict, rows: list[dict], date_from: str, date_to: str, o
     scope = {None: "", "CH": ", federal authorities"}.get(canton, f", authorities of {canton}")
     out = [f"# simap award winners, {date_from} → {date_to}{scope}, sorted by {order}\n",
            f"{quality['awards']} awards · {quality['winner_rows']} winner rows · "
-           f"UID known {quality['with_uid']} · without price {quality['without_price']} · "
+           f"UID known {quality['with_uid']} · without price {quality['without_price']} "
+           f"(published as 0: {quality['price_zero']}) · "
            f"price incl. VAT {quality['price_incl_vat']} / excl. VAT {quality['price_excl_vat']} · "
            f"other currency {quality['other_currency']} · "
            f"projects with a shared amount {quality['shared_amount_projects']} · "

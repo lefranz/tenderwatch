@@ -28,7 +28,7 @@ def conn():
                 publication_id text, project_id text, vendor_id text, uid text,
                 vendor_name text, vendor_canton text, proc_office_id text, pub_type text,
                 n_submissions int, price numeric, currency text, vat_type text,
-                publication_date date, jurisdiction text)""")
+                publication_date date, jurisdiction text, price_zero bool DEFAULT false)""")
         cur.execute("CREATE TEMP TABLE zefix_companies (uid text, name text, legal_seat text,"
                     " canton text, status text, error text)")
         for proj, pub, vendor, price, jur in ROWS:
@@ -43,9 +43,9 @@ def test_shared_amount_counted_once_and_kept_out_of_published_amount(conn):
     quality, rows = ranking.ranking(conn, "2026-01-01", "2026-12-31")
     by = {r["company"]: r for r in rows}
     a, b = by["A"], by["B"]
-    assert (a["awards"], a["published_amount_chf"]) == (3, 100)
+    assert (a["awards"], a["projects"], a["published_amount_chf"]) == (3, 2, 100)
     assert (a["shared_amount_projects"], a["shared_amount_chf"]) == (1, 600)
-    assert (b["awards"], b["published_amount_chf"]) == (5, 150)
+    assert (b["awards"], b["projects"], b["published_amount_chf"]) == (5, 3, 150)
     assert (b["shared_amount_projects"], b["shared_amount_chf"]) == (2, 640)
     assert quality["shared_amount_projects"] == 2
 
@@ -62,3 +62,11 @@ def test_by_canton_keeps_the_confederation_apart(conn):
     assert set(rows) == {"GE", "CH"}
     assert (rows["GE"]["awards"], rows["GE"]["winners"], rows["GE"]["pct_winner_same_canton"]) == (2, 2, 100)
     assert (rows["CH"]["awards"], rows["CH"]["pct_winner_same_canton"]) == (3, None)
+
+
+def test_price_published_as_zero_counts_as_without_price(conn):
+    with conn.cursor() as cur:  # the view yields NULL and price_zero for a "confidential" 0
+        cur.execute("INSERT INTO v_awards_current VALUES ('P4','P4','C',NULL,'C','GE','GE','award',"
+                    "2,NULL,NULL,NULL,'2026-03-01','GE',true)")
+    quality, _ = ranking.ranking(conn, "2026-01-01", "2026-12-31")
+    assert (quality["without_price"], quality["price_zero"], quality["shared_amount_projects"]) == (1, 1, 2)

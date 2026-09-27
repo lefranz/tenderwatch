@@ -129,7 +129,8 @@ SELECT
     v->>'vendorName'                                AS vendor_name,
     v->'vendorAddress'->>'countryId'                AS vendor_country,
     v->'vendorAddress'->>'cantonId'                 AS vendor_canton,
-    (v->'price'->>'price')::numeric                 AS price,
+    -- 0 = price withheld ("confidential"), not free: NULL here, price_zero keeps it
+    NULLIF((v->'price'->>'price')::numeric, 0)      AS price,
     v->'price'->>'currency'                         AS currency,
     v->'price'->>'vatType'                          AS vat_type,
     ml(v->'note')                                   AS vendor_note,
@@ -138,7 +139,8 @@ SELECT
     CASE WHEN po.type LIKE '%federation' THEN 'CH'
          WHEN po.type LIKE '%cantonal' OR po.type LIKE '%communal'
          THEN p.detail->'project-info'->'procOfficeAddress'->>'cantonId'
-    END                                             AS jurisdiction
+    END                                             AS jurisdiction,
+    (v->'price'->>'price')::numeric = 0             AS price_zero
 FROM publications p
 JOIN projects pr ON pr.id = p.project_id
 CROSS JOIN LATERAL jsonb_array_elements(COALESCE(p.detail->'decision'->'vendors', '[]'::jsonb)) v
