@@ -63,6 +63,19 @@ Tender documents require a vendor account (`/api/vendors/v1/my/...`).
 - `past-publications` of a lot publication **requires `?lotId=`**; without it the
   API answers **HTTP 400**.
 
+## Corrections
+
+- **A correction is a NEW publication, not an edit in place** (measured
+  2026-09-29). Of the publications flagged `corrected`, 96 % (2,857 of 2,964)
+  have a sibling of the same type in the same project and lot, against 5 % of the
+  others. Search and `past-publications` therefore catch corrections without
+  downloading anything again.
+- **In-place changes exist but are thin.** Of 120 details downloaded again 1 to
+  4 days after the first fetch, one had changed: `ted` went from `null` to
+  `published` with a link (forwarding to the EU's Tenders Electronic Daily,
+  after the fact). Later edits are not ruled out by so short a gap; the weekly
+  `collect refresh` is what keeps measuring them.
+
 ## Publication detail
 
 Some fields worth knowing, for an award (`pubType: award` or `direct_award`):

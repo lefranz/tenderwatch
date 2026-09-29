@@ -1,6 +1,6 @@
 import datetime as dt
 
-from tenderwatch.collect import current_refs, months, normalize_uid
+from tenderwatch.collect import current_refs, months, normalize_uid, too_many_missing
 
 
 def test_normalize_uid():
@@ -24,3 +24,10 @@ def test_one_lot_is_one_publication():
         {"publicationId": "b", "lotId": "L2", "lotNumber": 2, "pubType": "award"}]}
     assert [r["id"] for r in current_refs(p)] == ["a", "b"]
     assert [r["lot_id"] for r in current_refs({"publicationId": "c", "lots": []})] == [None]
+
+
+def test_an_empty_search_does_not_mark_the_window_as_gone():
+    assert too_many_missing(3909, 3909)
+    assert too_many_missing(400, 3909)
+    assert not too_many_missing(12, 3909)
+    assert not too_many_missing(15, 100)   # floor: a few withdrawals in a small window

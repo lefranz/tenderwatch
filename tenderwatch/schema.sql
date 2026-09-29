@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS projects (
     -- project gets a new publication, its history is read again.
     history_for             UUID
 );
+-- Missing from the search since: set by `collect daily` when a project of the
+-- rolling window is no longer returned, reset to NULL if it comes back.
+-- Nothing is deleted: a project withdrawn from simap remains a fact.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS missing_since TIMESTAMPTZ;
 
 -- A publication (tender, award, direct award, abandonment…).
 -- A project split into lots publishes one award PER lot: lot_id tells them apart.

@@ -7,6 +7,12 @@ Five steps, each resumable (whatever is already stored is skipped):
 3. ``details`` — raw detail of every publication;
 4. ``vendors`` — public profile of every award winner (carries the UID);
 5. ``offices`` — every contracting authority and its type, in one call.
+
+For a daily run:
+
+- ``daily``   — ``search`` over a rolling window, then the four other steps, and
+  flags the projects of the window that the search no longer returns;
+- ``refresh`` — downloads again the detail of recent publications (weekly).
 """
 from __future__ import annotations
 
@@ -89,7 +95,8 @@ def step_search(conn, client: Client, first: dt.date, last: dt.date):
                            project_number = EXCLUDED.project_number,
                            newest_publication_date = EXCLUDED.newest_publication_date,
                            search_json = EXCLUDED.search_json,
-                           last_seen = now()""",
+                           last_seen = now(),
+                           missing_since = NULL""",
                     (p["id"], p["projectNumber"], p.get("publicationDate"), json.dumps(p)))
                 for ref in current_refs(p):
                     cur.execute(UPSERT_PUB, {**ref, "project_id": p["id"]})
@@ -98,6 +105,61 @@ def step_search(conn, client: Client, first: dt.date, last: dt.date):
         total += n
         log.info("search %s → %s: %d projects", a, b, n)
     log.info("search done: %d projects, %d calls", total, client.calls)
+    return total
+
+
+# Beyond this share, a broken search is more likely than withdrawals: nothing is
+# flagged. A search returning nothing must never mark the whole window as gone.
+MAX_MISSING = 0.05
+
+
+def too_many_missing(missing: int, expected: int) -> bool:
+    return missing > max(20, MAX_MISSING * expected)
+
+
+def mark_missing(conn, first: dt.date, last: dt.date, since) -> bool:
+    """Flag the projects of the window that the search started at `since` did not see.
+
+    A project's newest publication date only grows: a project that was in
+    [first, last] and still exists is still in it. Returns False when too many
+    projects are missing to be credible (nothing is flagged then).
+    """
+    with conn.cursor() as cur:
+        cur.execute("""SELECT count(*), count(*) FILTER (WHERE last_seen < %s AND missing_since IS NULL)
+                       FROM projects WHERE newest_publication_date BETWEEN %s AND %s""",
+                    (since, first, last))
+        expected, missing = cur.fetchone()
+        if too_many_missing(missing, expected):
+            log.error("missing: %d of %d projects not returned by the search, flagging suspended",
+                      missing, expected)
+            return False
+        cur.execute("""UPDATE projects SET missing_since = now()
+                       WHERE newest_publication_date BETWEEN %s AND %s
+                         AND last_seen < %s AND missing_since IS NULL
+                       RETURNING project_number""", (first, last, since))
+        gone = [r[0] for r in cur.fetchall()]
+    conn.commit()
+    log.info("missing: %d new projects no longer returned by the search %s", len(gone), " ".join(gone[:20]))
+    return True
+
+
+def step_daily(conn, client: Client, last: dt.date, days: int = 60) -> bool:
+    """Rolling-window search, flag missing projects, then the four other steps.
+
+    Returns False if flagging was suspended (see ``mark_missing``).
+    """
+    first = last - dt.timedelta(days=days)
+    with conn.cursor() as cur:
+        cur.execute("SELECT now()")
+        since = cur.fetchone()[0]
+    conn.commit()
+    step_search(conn, client, first, last)
+    ok = mark_missing(conn, first, last, since)
+    step_history(conn, client)
+    step_details(conn, client)
+    step_vendors(conn, client)
+    step_offices(conn, client)
+    return ok
 
 
 def step_history(conn, client: Client):
@@ -127,6 +189,35 @@ def step_history(conn, client: Client):
     log.info("history done, %d calls", client.calls)
 
 
+def fetch_detail(conn, client: Client, pub_id, proj_id) -> str:
+    """Download one detail; the previous version goes to publication_history if it changed.
+
+    Returns "ok", "changed", "gone" (was stored, now not found) or "not_found".
+    """
+    with conn.cursor() as cur:
+        try:
+            d = client.publication_detail(str(proj_id), str(pub_id))
+        except NotFound as exc:
+            # A detail already stored is kept: only the error is recorded.
+            cur.execute("UPDATE publications SET detail_error = %s WHERE id = %s RETURNING detail IS NOT NULL",
+                        (str(exc)[:500], pub_id))
+            had = cur.fetchone()[0]
+            conn.commit()
+            return "gone" if had else "not_found"
+        h = content_hash(d)
+        # Keep the previous version if the content changed (see schema.sql)
+        cur.execute("""INSERT INTO publication_history (publication_id, content_hash, detail, fetched_at)
+                       SELECT id, content_hash, detail, detail_fetched_at FROM publications
+                       WHERE id = %s AND detail IS NOT NULL AND content_hash <> %s
+                       ON CONFLICT DO NOTHING""", (pub_id, h))
+        changed = cur.rowcount
+        cur.execute("""UPDATE publications SET detail = %s, content_hash = %s,
+                           detail_fetched_at = now(), detail_error = NULL
+                       WHERE id = %s""", (json.dumps(d), h, pub_id))
+    conn.commit()
+    return "changed" if changed else "ok"
+
+
 def step_details(conn, client: Client, limit: int | None = None):
     with conn.cursor() as cur:
         cur.execute("""SELECT id, project_id FROM publications
@@ -135,25 +226,32 @@ def step_details(conn, client: Client, limit: int | None = None):
         todo = cur.fetchall()
     log.info("details: %d publications to download", len(todo))
     for i, (pub_id, proj_id) in enumerate(todo, 1):
-        with conn.cursor() as cur:
-            try:
-                d = client.publication_detail(str(proj_id), str(pub_id))
-            except NotFound as exc:
-                cur.execute("UPDATE publications SET detail_error = %s WHERE id = %s", (str(exc)[:500], pub_id))
-            else:
-                h = content_hash(d)
-                # Keep the previous version if the content changed (see schema.sql)
-                cur.execute("""INSERT INTO publication_history (publication_id, content_hash, detail, fetched_at)
-                               SELECT id, content_hash, detail, detail_fetched_at FROM publications
-                               WHERE id = %s AND detail IS NOT NULL AND content_hash <> %s
-                               ON CONFLICT DO NOTHING""", (pub_id, h))
-                cur.execute("""UPDATE publications SET detail = %s, content_hash = %s,
-                                   detail_fetched_at = now(), detail_error = NULL
-                               WHERE id = %s""", (json.dumps(d), h, pub_id))
-        conn.commit()
+        fetch_detail(conn, client, pub_id, proj_id)
         if i % 500 == 0:
             log.info("details: %d/%d (%d calls)", i, len(todo), client.calls)
     log.info("details done, %d calls", client.calls)
+
+
+def step_refresh(conn, client: Client, since: dt.date):
+    """Download again the detail of stored publications published since `since`.
+
+    Measured 2026-09-29: a correction arrives as a NEW publication (caught by
+    search and history), not in place. What changes in place is thinner (the TED
+    link, added afterwards): hence a weekly pace rather than a daily one.
+    """
+    with conn.cursor() as cur:
+        cur.execute("""SELECT id, project_id FROM publications
+                       WHERE detail IS NOT NULL AND publication_date >= %s
+                       ORDER BY publication_date DESC""", (since,))
+        todo = cur.fetchall()
+    log.info("refresh: %d publications since %s", len(todo), since)
+    stats = {}
+    for pub_id, proj_id in todo:
+        r = fetch_detail(conn, client, pub_id, proj_id)
+        stats[r] = stats.get(r, 0) + 1
+        if r in ("changed", "gone"):
+            log.warning("refresh %s: %s", pub_id, r)
+    log.info("refresh done: %s, %d calls", stats, client.calls)
 
 
 def step_vendors(conn, client: Client):

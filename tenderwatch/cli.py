@@ -2,6 +2,8 @@
 
     tenderwatch init-db
     tenderwatch collect all --from 2026-01-01 --to 2026-09-30
+    tenderwatch collect daily              # rolling 60-day window, e.g. from cron
+    tenderwatch collect refresh            # re-read details of the last 30 days, weekly
     tenderwatch zefix
     tenderwatch ranking --order amount --top 100 --csv ranking.csv
     tenderwatch ranking --canton GE        # authorities of Geneva (CH = federal)
@@ -27,9 +29,12 @@ def main(argv=None):
     sub.add_parser("init-db", help="create tables and views (idempotent)")
 
     c = sub.add_parser("collect", help="download from simap.ch")
-    c.add_argument("step", choices=["search", "history", "details", "vendors", "offices", "all"])
+    c.add_argument("step", choices=["search", "history", "details", "vendors", "offices", "all",
+                                    "daily", "refresh"])
     c.add_argument("--from", dest="date_from", type=dt.date.fromisoformat)
     c.add_argument("--to", dest="date_to", type=dt.date.fromisoformat, default=dt.date.today())
+    c.add_argument("--days", type=int,
+                   help="daily: rolling window (default 60); refresh: age of publications (default 30)")
     c.add_argument("--limit", type=int, help="details: at most N publications")
     c.add_argument("--interval", type=float, default=0.35, help="minimum seconds between two calls")
 
@@ -55,6 +60,11 @@ def main(argv=None):
         if args.step in ("search", "all") and not args.date_from:
             ap.error("--from is required for search/all")
         client = Client(min_interval=args.interval)
+        if args.step == "daily":
+            return 0 if collect.step_daily(conn, client, args.date_to, args.days or 60) else 1
+        if args.step == "refresh":
+            collect.step_refresh(conn, client, args.date_to - dt.timedelta(days=args.days or 30))
+            return 0
         if args.step in ("search", "all"):
             collect.step_search(conn, client, args.date_from, args.date_to)
         if args.step in ("history", "all"):

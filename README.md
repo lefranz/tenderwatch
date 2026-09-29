@@ -81,6 +81,12 @@ venv/bin/tenderwatch collect all --from 2026-01-01 --to 2026-09-30
 #    = search (projects, month by month) → history (past publications)
 #      → details (raw detail) → vendors (profiles, UID) → offices (authorities)
 
+#    Keeping up to date, e.g. from cron or a systemd timer:
+venv/bin/tenderwatch collect daily      # rolling 60-day window + the other steps (~5 min)
+venv/bin/tenderwatch collect refresh    # weekly: re-read details of the last 30 days
+#    daily exits with 1 if more than 5 % of the window vanished from the search:
+#    a broken search, not withdrawals, so nothing is flagged
+
 # 2. Link winners to the commercial register
 venv/bin/tenderwatch zefix
 
@@ -103,7 +109,7 @@ never requires downloading again.
 
 | Table / view | Content |
 |---|---|
-| `projects` | one project per row, with the search answer |
+| `projects` | one project per row, with the search answer; `missing_since` when the daily search stopped returning it |
 | `publications` | one publication per row (one **lot** = one publication), raw `detail` |
 | `publication_history` | replaced versions: an edited publication is never overwritten |
 | `vendors` | public profiles of winners, including the normalised UID |
