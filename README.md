@@ -15,7 +15,10 @@ What it does today:
 - **links** each winner to its commercial-register record (legal name, status,
   seat, legal form, official gazette notices);
 - **ranks** the companies that win the most contracts, by number of awards,
-  published amount or number of contracting authorities.
+  published amount or number of contracting authorities;
+- computes a first **risk indicator**, preliminary: contracting authorities
+  that receive single bids more often than on similar contracts
+  ([docs/indicators/single-bid.md](docs/indicators/single-bid.md)).
 
 What it is heading for: **risk indicators** on procedures — single bids, direct
 awards and the exemption invoked, short tender periods, concentration of one
@@ -95,6 +98,10 @@ venv/bin/tenderwatch ranking                                 # current year, top
 venv/bin/tenderwatch ranking --order amount --top 100 --csv ranking.csv
 venv/bin/tenderwatch ranking --canton GE                     # authorities of Geneva (CH = federal)
 venv/bin/tenderwatch ranking --by-canton                     # one row per canton
+
+# 4. Risk indicators
+venv/bin/tenderwatch single-bid                              # authorities with more single bids than similar contracts
+venv/bin/tenderwatch single-bid --authority <proc_office_id> # their lots, one by one
 ```
 
 Pace: about 3 calls per second (`--interval 0.35`). A full year is roughly
@@ -135,15 +142,16 @@ Summarised here, detailed in [docs/methodology.md](docs/methodology.md):
 ## Roadmap
 
 - [x] Collect the new simap platform (from 2026), link winners to Zefix, rank them
-- [ ] Go back to 1 July 2024, the start of the new platform
-- [ ] Daily incremental collection
+- [x] Go back to 1 July 2024, the start of the new platform
+- [x] Daily incremental collection
 - [ ] **Export to the [Open Contracting Data Standard](https://standard.open-contracting.org/)
       (OCDS).** Mapping simap publications to OCDS releases would make Swiss data
       comparable with other countries' and let existing tools run on it
       unchanged — first of all [Cardinal](https://github.com/open-contracting/cardinal-rs),
       which computes red flags from the OCP guide
 - [ ] Risk indicators, each mapped to the red flag of the OCP guide it
-      implements, calibrated on documented cases before publication
+      implements, calibrated on documented cases before publication — first
+      one, single bid, preliminary ([testing protocol](docs/indicators/README.md))
 - [ ] Members of bidding consortia, extracted from the free-text notes
 - [ ] The 2007–2024 archive (archiv.simap.ch), matched to the register by name
       and address for lack of a UID

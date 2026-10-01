@@ -8,6 +8,8 @@
     tenderwatch ranking --order amount --top 100 --csv ranking.csv
     tenderwatch ranking --canton GE        # authorities of Geneva (CH = federal)
     tenderwatch ranking --by-canton        # one row per canton
+    tenderwatch single-bid                 # risk indicator, by contracting authority
+    tenderwatch single-bid --authority <proc_office_id>   # its lots, one by one
 """
 from __future__ import annotations
 
@@ -17,7 +19,7 @@ import datetime as dt
 import logging
 import sys
 
-from . import collect, db, ranking, zefix
+from . import collect, db, ranking, single_bid, zefix
 from .simap import Client
 
 
@@ -49,6 +51,16 @@ def main(argv=None):
     r.add_argument("--csv", help="also write the ranking to this CSV file")
     r.add_argument("--canton", type=str.upper, help="authorities of this canton (CH = federal)")
     r.add_argument("--by-canton", action="store_true", help="one row per canton of the contracting authority")
+
+    s = sub.add_parser("single-bid", help="risk indicator: single bids by contracting authority")
+    s.add_argument("--from", dest="date_from", default="2024-07-01")
+    s.add_argument("--to", dest="date_to", default=dt.date.today().isoformat())
+    s.add_argument("--min-projects", type=int, default=10, help="minimum projects to test an authority")
+    s.add_argument("--min-peers", type=int, default=50, help="minimum projects in a comparison group")
+    s.add_argument("--canton", type=str.upper, help="only show authorities of this canton (CH = federal)")
+    s.add_argument("--top", type=int, default=50)
+    s.add_argument("--csv", help="write every tested authority to this CSV file")
+    s.add_argument("--authority", help="lot-by-lot detail of one authority (proc_office_id)")
 
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(asctime)s %(levelname)s %(message)s")
@@ -97,6 +109,24 @@ def main(argv=None):
             print(ranking.canton_markdown(rows, args.date_from, args.date_to))
         else:
             print(ranking.to_markdown(quality, rows, args.date_from, args.date_to, args.order, args.canton))
+    elif args.command == "single-bid":
+        lots = single_bid.lots(conn, args.date_from, args.date_to, args.min_peers)
+        if args.authority:
+            out = single_bid.detail_markdown(lots, args.authority)
+            if out is None:
+                print(f"no lot awarded after competition for {args.authority} in the period", file=sys.stderr)
+                return 1
+            print(out)
+            return 0
+        rows = single_bid.by_authority(lots, args.min_projects)
+        if args.csv:
+            with open(args.csv, "w", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=list(rows[0]) if rows else single_bid.COLUMNS)
+                w.writeheader()
+                w.writerows(rows)
+            print(f"{len(rows)} rows → {args.csv}", file=sys.stderr)
+        print(single_bid.to_markdown(lots, rows, args.date_from, args.date_to, args.min_projects,
+                                     args.top, args.canton))
     return 0
 
 

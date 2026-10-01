@@ -63,6 +63,17 @@ is expected and says little on its own. More telling, and the first planned
 indicator: **concentration at a contracting authority** — the share of one
 authority's awards that goes to the same company.
 
+## Risk indicators
+
+Each indicator has its own page in [indicators/](indicators/): plain-language
+explanation, exact criteria, tests passed and a log of its runs. The protocol
+(statuses, the five tests, how a run is recorded) is in
+[indicators/README.md](indicators/README.md).
+
+| Indicator | Status | Page |
+|---|---|---|
+| Single bid, by contracting authority | preliminary | [single-bid.md](indicators/single-bid.md) |
+
 ## Known limits of the data
 
 - **Consortia.** Only the lead vendor has a `vendorId`; other members are named
@@ -79,6 +90,10 @@ authority's awards that goes to the same company.
   `--order projects` ranks on it.
 - **A price published as 0 means "confidential"**, not free. The view turns it
   into NULL and flags it with `price_zero`: 203 winner rows in 2026.
+- **The authority named in a publication is its contact address**, sometimes
+  a mandated architecture firm. The actual authority is in `proc_offices`,
+  through `procOfficeId`: `v_awards.proc_office_name` should not be used to
+  name the authority.
 - **Losing bidders and their prices are never published.** Detecting collusion
   between bidders (bid rotation, cover bids, price patterns) requires all bids;
   only the competition authority has them.
