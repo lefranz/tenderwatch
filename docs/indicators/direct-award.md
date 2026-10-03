@@ -47,6 +47,39 @@ state its legal ground.
 | **Flagged** | `q < 0.05` |
 | **Authority name** | `proc_offices.name` via `procOfficeId`, not the contact address name |
 
+## Legal ground cited
+
+Above the thresholds, a direct award must rest on one of the grounds listed in
+art. 21 para. 2 of the federal act (PPA) and of the intercantonal agreement
+(IPPA), same letters in both:
+
+| Letter | Ground |
+|---|---|
+| a | no suitable bid in an earlier tender |
+| b | all bids rigged |
+| c | single supplier (technical or artistic reasons, intellectual property) |
+| d | unforeseeable urgency |
+| e | replacement or extension of earlier deliveries |
+| f | prototypes, research and development |
+| g | commodity exchange |
+| h | time-limited bargain |
+| i | follow-up of a design contest |
+
+simap has **no field** for it: the ground is only in the free-text
+justification, in four languages. `grounds()` reads the letters cited
+(« Art. 21 Abs. 2 lit. c IVöB », « art. 21, al. 2, let. e, LMP », « Bst. c
+und d », « la lettre c de l'article 21 »…). Each direct award gets `ground`:
+the letters, **`other`** when the justification cites no recognised letter,
+**`empty`** when there is no justification at all. Each authority gets a count
+by letter (`grounds` column), and `--authority` shows it lot by lot.
+
+`other` is not an absence of ground: the justification may paraphrase the law
+(« seul fournisseur », « Wechsel des Anbieters »), cite only « art. 21 al. 2 »
+without a letter, or cite another provision. Geneva still cites its own
+regulation (RMP art. 15 para. 3), whose letters do not match art. 21 and are
+therefore not read. **`empty` is a fact**: the authority published a direct
+award above the thresholds without saying why.
+
 ## Limits specific to this indicator
 
 - **Only published direct awards count.** Below the thresholds, publishing a
@@ -105,3 +138,26 @@ state its legal ground.
   subscriptions), public insurers and utilities, road offices, and at least
   one authority awarding to an entity of its own. Mostly the categories the
   limits above predict.
+
+### 3 October 2026 — legal ground cited
+
+Same command and data. 4,264 direct-award lots above the first bracket
+(≥ CHF 150,000), where a ground is required:
+
+- **a letter of art. 21 para. 2 is cited by 2,111 (50 %)**: e (extension of
+  earlier deliveries) 1,109, c (single supplier) 896, d (urgency) 159, a (no
+  suitable bid) 135, i 48, f 32, h 11, b 5, g 3. Two letters can be cited
+  together.
+- **no letter recognised: 1,518 (36 %)**; **no justification at all: 635
+  (15 %)**.
+- Federal authorities cite a letter for 71 % of their direct awards and leave
+  1 % without justification; cantonal and communal ones 41 % and 20 %.
+- Missing justifications are concentrated: one canton accounts for 45 % of
+  them (286 of 635), the next four for another 35 %.
+- The 56 flagged authorities do not differ much from the others: letter cited
+  47 % against 51 %, no justification 14 % against 15 %. The ground is
+  therefore not a filter on the flagged list but a way into each file.
+- Checked by hand on samples: two-letter citations and repeated citations are
+  read correctly; the unrecognised ones are paraphrases, citations of
+  para. 2 without a letter, the Geneva regulation, or para. 1 cited in error.
+

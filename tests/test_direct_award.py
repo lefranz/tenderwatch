@@ -3,6 +3,25 @@ import pytest
 from tenderwatch import db, direct_award
 
 
+@pytest.mark.parametrize("text, letters", [
+    ("Gestützt auf Art. 21 Abs. 2 lit. c IVöB kann ein Auftrag", "c"),
+    ("Conformément à l'art. 21, al. 2, let. e, LMP, le marché", "e"),
+    ("in base all'art. 21 cpv. 2 lett. c e d CIAP", "cd"),
+    ("gemäss Art. 21 IVöB Abs. 2, Bst. c. und e., bezeichnete Ausnahme", "ce"),
+    ("(art. 21, par. 2, let. e & c de la LMP)", "ce"),
+    ("La lettre c de l'article 21 AIMP s'applique", "c"),
+    ("Art. 21, al. 2, let. e, LMP [...] puis art. 21, al. 2, let. a", "ae"),
+    ("art. 21 al. 2 let. c et aucune alternative", "c"),
+    # not recognised: no letter, para. 1, paraphrase, nothing
+    ("Art. 21 al. 2 AIMP relatif à la procédure de gré à gré exceptionnel", ""),
+    ("Freihändige Folgebeschaffung gestützt auf Art. 21 Abs. 1 Bst. e IVöB", ""),
+    ("Le constructeur est le seul à pouvoir fournir sept châssis-cabines", ""),
+    (None, ""),
+])
+def test_grounds(text, letters):
+    assert direct_award.grounds(text) == letters
+
+
 @pytest.fixture
 def conn():
     try:
@@ -22,10 +41,11 @@ def conn():
     c.close()
 
 
-def add(cur, pub, project, po, jur, direct, price=500000, order_type="service"):
+def add(cur, pub, project, po, jur, direct, price=500000, order_type="service", justification=None):
     pub_type, process = ("direct_award", "direct") if direct else ("award", "open")
-    cur.execute("INSERT INTO v_awards_current VALUES (%s,%s,%s,%s,'2026-03-01','t',%s,%s,%s,%s,NULL,%s,'chf',"
-                "NULL,'v','V',%s)", (pub, project, po, project, po, jur, order_type, process, price, pub_type))
+    cur.execute("INSERT INTO v_awards_current VALUES (%s,%s,%s,%s,'2026-03-01','t',%s,%s,%s,%s,%s,%s,'chf',"
+                "NULL,'v','V',%s)",
+                (pub, project, po, project, po, jur, order_type, process, justification, price, pub_type))
 
 
 def lots_by_pub(conn, min_peers, brackets=direct_award.DEFAULT_BRACKETS):
@@ -74,3 +94,21 @@ def test_lots_of_a_project_weigh_one_and_authorities_are_tested(conn):
     a = next(r for r in rows if r["proc_office_id"] == "A")
     assert (a["projects"], a["lots"], a["direct_award_lots"], a["direct_award"], a["expected"]) == (10, 13, 4, 1, 1)
     assert all(0 <= r["q"] <= 1 for r in rows)
+
+
+def test_grounds_by_lot_and_by_authority(conn):
+    with conn.cursor() as cur:
+        add(cur, "a0", "pa0", "A", "GE", True, justification="Art. 21 Abs. 2 lit. c IVöB")
+        add(cur, "a1", "pa1", "A", "GE", True, justification="art. 21 al. 2 let. c et e AIMP")
+        add(cur, "a2", "pa2", "A", "GE", True, justification="seul fournisseur")
+        add(cur, "a5", "pa5", "A", "GE", True, justification=" ")
+        add(cur, "a3", "pa3", "A", "GE", False)
+        add(cur, "a4", "pa4", "A", "GE", True, price=50000, justification="Art. 21 Abs. 2 lit. d")  # below 150k
+        add(cur, "b0", "pb0", "B", "GE", False)                                                    # a peer
+    r = lots_by_pub(conn, min_peers=1)
+    assert [r[p]["ground"] for p in ("a0", "a1", "a2", "a3", "a4", "a5")] == ["c", "ce", "other", None, "d", "empty"]
+    a = next(x for x in direct_award.by_authority(r.values(), min_projects=1) if x["proc_office_id"] == "A")
+    assert a["grounds"] == "c 2 · e 1 · other 1 · d 1 · empty 1"
+    line = direct_award._grounds_line(list(r.values()))        # above the first bracket only
+    assert ("4 · art. 21 para. 2 letter cited by 2 (50%): c 2 · e 1 · no letter recognised 1 · "
+            "no justification 1\n") in line

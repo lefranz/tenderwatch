@@ -21,7 +21,8 @@ What it does today:
   ([docs/indicators/single-bid.md](docs/indicators/single-bid.md)), or award
   contracts directly, without competition
   ([docs/indicators/direct-award.md](docs/indicators/direct-award.md)), more
-  often than on similar contracts.
+  often than on similar contracts — with the legal ground each direct award
+  cites, read from its free-text justification.
 
 What it is heading for: **risk indicators** on procedures — single bids, direct
 awards and the exemption invoked, short tender periods, concentration of one
