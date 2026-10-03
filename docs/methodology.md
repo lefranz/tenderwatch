@@ -73,6 +73,7 @@ explanation, exact criteria, tests passed and a log of its runs. The protocol
 | Indicator | Status | Page |
 |---|---|---|
 | Single bid, by contracting authority | preliminary | [single-bid.md](indicators/single-bid.md) |
+| Direct award, by contracting authority | preliminary | [direct-award.md](indicators/direct-award.md) |
 
 ## Known limits of the data
 

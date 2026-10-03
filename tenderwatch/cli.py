@@ -11,6 +11,7 @@
     tenderwatch single-bid                 # risk indicator, by contracting authority
     tenderwatch single-bid --authority <proc_office_id>   # its lots, one by one
     tenderwatch single-bid --brackets 100k,500k,2M        # other price brackets
+    tenderwatch direct-award               # risk indicator: direct awards, by contracting authority
 """
 from __future__ import annotations
 
@@ -20,7 +21,7 @@ import datetime as dt
 import logging
 import sys
 
-from . import collect, db, ranking, single_bid, zefix
+from . import collect, db, direct_award, ranking, risk, single_bid, zefix
 from .simap import Client
 
 
@@ -53,17 +54,22 @@ def main(argv=None):
     r.add_argument("--canton", type=str.upper, help="authorities of this canton (CH = federal)")
     r.add_argument("--by-canton", action="store_true", help="one row per canton of the contracting authority")
 
-    s = sub.add_parser("single-bid", help="risk indicator: single bids by contracting authority")
-    s.add_argument("--from", dest="date_from", default="2024-07-01")
-    s.add_argument("--to", dest="date_to", default=dt.date.today().isoformat())
-    s.add_argument("--min-projects", type=int, default=10, help="minimum projects to test an authority")
-    s.add_argument("--min-peers", type=int, default=50, help="minimum projects in a comparison group")
-    s.add_argument("--brackets", type=single_bid.parse_brackets, default=single_bid.DEFAULT_BRACKETS,
-                   help="price bracket bounds in CHF, e.g. 250k,1M,5M (default); 'none' ignores the price")
-    s.add_argument("--canton", type=str.upper, help="only show authorities of this canton (CH = federal)")
-    s.add_argument("--top", type=int, default=50)
-    s.add_argument("--csv", help="write every tested authority to this CSV file")
-    s.add_argument("--authority", help="lot-by-lot detail of one authority (proc_office_id)")
+    for name, module, help_ in (
+            ("single-bid", single_bid, "risk indicator: single bids by contracting authority"),
+            ("direct-award", direct_award, "risk indicator: direct awards by contracting authority")):
+        s = sub.add_parser(name, help=help_)
+        s.set_defaults(indicator=module)
+        s.add_argument("--from", dest="date_from", default="2024-07-01")
+        s.add_argument("--to", dest="date_to", default=dt.date.today().isoformat())
+        s.add_argument("--min-projects", type=int, default=10, help="minimum projects to test an authority")
+        s.add_argument("--min-peers", type=int, default=50, help="minimum projects in a comparison group")
+        bounds = ",".join(risk.label(b) for b in module.DEFAULT_BRACKETS)
+        s.add_argument("--brackets", type=risk.parse_brackets, default=module.DEFAULT_BRACKETS,
+                       help=f"price bracket bounds in CHF (default {bounds}); 'none' ignores the price")
+        s.add_argument("--canton", type=str.upper, help="only show authorities of this canton (CH = federal)")
+        s.add_argument("--top", type=int, default=50)
+        s.add_argument("--csv", help="write every tested authority to this CSV file")
+        s.add_argument("--authority", help="lot-by-lot detail of one authority (proc_office_id)")
 
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(asctime)s %(levelname)s %(message)s")
@@ -112,24 +118,24 @@ def main(argv=None):
             print(ranking.canton_markdown(rows, args.date_from, args.date_to))
         else:
             print(ranking.to_markdown(quality, rows, args.date_from, args.date_to, args.order, args.canton))
-    elif args.command == "single-bid":
-        lots = single_bid.lots(conn, args.date_from, args.date_to, args.min_peers, args.brackets)
+    elif args.command in ("single-bid", "direct-award"):
+        ind = args.indicator
+        lots = ind.lots(conn, args.date_from, args.date_to, args.min_peers, args.brackets)
         if args.authority:
-            out = single_bid.detail_markdown(lots, args.authority)
+            out = ind.detail_markdown(lots, args.authority)
             if out is None:
-                print(f"no lot awarded after competition for {args.authority} in the period", file=sys.stderr)
+                print(f"no awarded lot for {args.authority} in the period", file=sys.stderr)
                 return 1
             print(out)
             return 0
-        rows = single_bid.by_authority(lots, args.min_projects)
+        rows = ind.by_authority(lots, args.min_projects)
         if args.csv:
             with open(args.csv, "w", newline="") as f:
-                w = csv.DictWriter(f, fieldnames=list(rows[0]) if rows else single_bid.COLUMNS)
+                w = csv.DictWriter(f, fieldnames=list(rows[0]) if rows else ind.COLUMNS)
                 w.writeheader()
                 w.writerows(rows)
             print(f"{len(rows)} rows → {args.csv}", file=sys.stderr)
-        print(single_bid.to_markdown(lots, rows, args.date_from, args.date_to, args.min_projects,
-                                     args.top, args.canton))
+        print(ind.to_markdown(lots, rows, args.date_from, args.date_to, args.min_projects, args.top, args.canton))
     return 0
 
 

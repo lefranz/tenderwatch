@@ -16,9 +16,12 @@ What it does today:
   seat, legal form, official gazette notices);
 - **ranks** the companies that win the most contracts, by number of awards,
   published amount or number of contracting authorities;
-- computes a first **risk indicator**, preliminary: contracting authorities
-  that receive single bids more often than on similar contracts
-  ([docs/indicators/single-bid.md](docs/indicators/single-bid.md)).
+- computes two **risk indicators**, preliminary: contracting authorities
+  that receive single bids
+  ([docs/indicators/single-bid.md](docs/indicators/single-bid.md)), or award
+  contracts directly, without competition
+  ([docs/indicators/direct-award.md](docs/indicators/direct-award.md)), more
+  often than on similar contracts.
 
 What it is heading for: **risk indicators** on procedures — single bids, direct
 awards and the exemption invoked, short tender periods, concentration of one
@@ -102,6 +105,7 @@ venv/bin/tenderwatch ranking --by-canton                     # one row per canto
 # 4. Risk indicators
 venv/bin/tenderwatch single-bid                              # authorities with more single bids than similar contracts
 venv/bin/tenderwatch single-bid --authority <proc_office_id> # their lots, one by one
+venv/bin/tenderwatch direct-award                            # authorities with more direct awards than similar contracts
 ```
 
 Pace: about 3 calls per second (`--interval 0.35`). A full year is roughly
@@ -150,8 +154,8 @@ Summarised here, detailed in [docs/methodology.md](docs/methodology.md):
       unchanged — first of all [Cardinal](https://github.com/open-contracting/cardinal-rs),
       which computes red flags from the OCP guide
 - [ ] Risk indicators, each mapped to the red flag of the OCP guide it
-      implements, calibrated on documented cases before publication — first
-      one, single bid, preliminary ([testing protocol](docs/indicators/README.md))
+      implements, calibrated on documented cases before publication — single
+      bid and direct award, preliminary ([testing protocol](docs/indicators/README.md))
 - [ ] Members of bidding consortia, extracted from the free-text notes
 - [ ] The 2007–2024 archive (archiv.simap.ch), matched to the register by name
       and address for lack of a UID

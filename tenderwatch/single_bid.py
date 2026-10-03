@@ -28,9 +28,10 @@ the valley, an exclusive right, a niche market.
 """
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import Counter
 
-from scipy.special import betainc
+from .risk import (DEFAULT_BRACKETS, _table, benjamini_hochberg, binom_sf,  # noqa: F401
+                   bracket_case, by_authority as _by_authority, parse_brackets)
 
 # One lot per row, with its expected rate. The "_a" windows are the authority's
 # own share of the group: it is subtracted, so an authority is not compared
@@ -91,41 +92,6 @@ FROM w
 ORDER BY proc_office_id, publication_date, project_number
 """
 
-DEFAULT_BRACKETS = (250_000, 1_000_000, 5_000_000)
-UNITS = {"k": 1_000, "M": 1_000_000}
-
-
-def parse_brackets(text: str) -> tuple[int, ...]:
-    """"250k,1M,5M" → (250000, 1000000, 5000000); "none" → () : price not used."""
-    if text.strip().lower() == "none":
-        return ()
-    bounds = []
-    for t in text.split(","):
-        t = t.strip()
-        bounds.append(int(float(t[:-1]) * UNITS[t[-1]]) if t[-1:] in UNITS else int(t))
-    if any(b <= 0 for b in bounds) or bounds != sorted(set(bounds)):
-        raise ValueError(f"brackets must be positive and increasing: {text}")
-    return tuple(bounds)
-
-
-def _label(v: int) -> str:
-    for unit, n in (("M", 1_000_000), ("k", 1_000)):
-        if v >= n and v % (n // 10) == 0:
-            return f"{v / n:g}{unit}"
-    return str(v)
-
-
-def bracket_case(bounds: tuple[int, ...]) -> str:
-    """SQL expression giving the price bracket of `price`. Bounds are ints, safe to inline."""
-    if not bounds:
-        return "'any'"
-    bounds = [int(b) for b in bounds]
-    whens = [f"WHEN price < {bounds[0]} THEN '<{_label(bounds[0])}'"]
-    whens += [f"WHEN price < {hi} THEN '{_label(lo)}-{_label(hi)}'" for lo, hi in zip(bounds, bounds[1:])]
-    return ("CASE WHEN price IS NULL THEN 'unknown' " + " ".join(whens)
-            + f" ELSE '>={_label(bounds[-1])}' END")
-
-
 COLUMNS = ["authority", "jurisdiction", "projects", "lots", "single_bid", "expected", "ratio", "p", "q",
            "top_winner", "top_winner_lots"]
 LOT_COLUMNS = ["publication_date", "project_number", "title", "order_type", "procedure", "bracket",
@@ -141,72 +107,9 @@ def lots(conn, date_from: str, date_to: str, min_peers: int = 50,
         return [dict(zip(names, r)) for r in cur.fetchall()]
 
 
-def binom_sf(x: float, n: float, p: float) -> float:
-    """P(X >= x) for X ~ Binomial(n, p), with real x and n (weighted lots)."""
-    if x <= 0:
-        return 1.0
-    if p <= 0:
-        return 0.0
-    return float(betainc(x, n - x + 1, p))
-
-
-def benjamini_hochberg(ps: list[float]) -> list[float]:
-    """Benjamini-Hochberg q-values, in the order of the p-values given."""
-    m = len(ps)
-    order = sorted(range(m), key=lambda i: ps[i])
-    q = [0.0] * m
-    prev = 1.0
-    for rank, i in reversed(list(enumerate(order, 1))):
-        prev = min(prev, ps[i] * m / rank)
-        q[i] = prev
-    return q
-
-
 def by_authority(lot_rows: list[dict], min_projects: int = 10) -> list[dict]:
     """Aggregate lots by authority; only those with at least min_projects projects are tested."""
-    groups = defaultdict(list)
-    for r in lot_rows:
-        if r["expected"] is not None:
-            groups[r["proc_office_id"]].append(r)
-    rows = []
-    for po, ls in groups.items():
-        n = sum(float(r["weight"]) for r in ls)
-        if n < min_projects - 1e-9:
-            continue
-        obs = sum(float(r["weight"]) * r["single"] for r in ls)
-        exp = sum(float(r["weight"]) * float(r["expected"]) for r in ls)
-        singles = Counter((r["winner"], r["winner_name"]) for r in ls if r["single"])
-        (_, name), k = singles.most_common(1)[0] if singles else ((None, None), 0)
-        rows.append({
-            "proc_office_id": po, "authority": ls[0]["authority"], "jurisdiction": ls[0]["jurisdiction"],
-            "projects": round(n, 1), "lots": len(ls), "single_bid_lots": sum(r["single"] for r in ls),
-            "single_bid": round(obs, 1), "expected": round(exp, 1),
-            "ratio": round(obs / exp, 2) if exp else None,
-            "p": binom_sf(obs, n, exp / n),
-            "top_winner": name, "top_winner_lots": k,
-        })
-    for r, q in zip(rows, benjamini_hochberg([r["p"] for r in rows])):
-        r["q"] = q
-    rows.sort(key=lambda r: (r["p"], -r["single_bid"]))
-    return rows
-
-
-def _fmt(c, v):
-    if v is None:
-        return ""
-    if c in ("p", "q"):
-        return f"{v:.1e}" if v < 0.001 else f"{v:.3f}"
-    if c == "expected":
-        return f"{float(v):.2f}" if v < 1 else f"{float(v):.1f}"
-    return str(v).replace("|", "/").replace("\n", " ")
-
-
-def _table(rows, cols, numbered=True):
-    out = [("| # " if numbered else "") + "| " + " | ".join(cols) + " |",
-           "|" + "---|" * (len(cols) + numbered)]
-    for i, r in enumerate(rows, 1):
-        out.append((f"| {i} " if numbered else "") + "| " + " | ".join(_fmt(c, r[c]) for c in cols) + " |")
-    return out
+    return _by_authority(lot_rows, min_projects, flag="single", name="single_bid")
 
 
 def to_markdown(lot_rows, rows, date_from, date_to, min_projects, top=50, canton=None) -> str:
