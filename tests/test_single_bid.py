@@ -14,6 +14,18 @@ def test_benjamini_hochberg():
     assert q == pytest.approx([0.04, 0.04 * 4 / 3, 0.04 * 4 / 3, 0.5])
 
 
+def test_brackets():
+    assert single_bid.parse_brackets("250k, 1M,5M") == single_bid.DEFAULT_BRACKETS
+    assert single_bid.parse_brackets("100000,1.5M") == (100_000, 1_500_000)
+    assert single_bid.parse_brackets("none") == ()
+    for bad in ("1M,250k", "250k,250k", "0,1M", "abc"):
+        with pytest.raises(ValueError):
+            single_bid.parse_brackets(bad)
+    case = single_bid.bracket_case((100_000, 1_500_000))
+    assert "'<100k'" in case and "'100k-1.5M'" in case and "'>=1.5M'" in case
+    assert single_bid.bracket_case(()) == "'any'"
+
+
 def lot(po, single, expected, weight=1.0, winner="W"):
     return {"proc_office_id": po, "authority": po, "jurisdiction": "GE", "weight": weight,
             "single": single, "expected": expected, "winner": winner, "winner_name": winner}
@@ -57,8 +69,9 @@ def add(cur, pub, project, po, jur, n_sub, pub_type="award", price=100000):
                 "'open',%s,%s,'chf',NULL,'v','V',%s)", (pub, project, po, project, po, jur, n_sub, price, pub_type))
 
 
-def lots_by_pub(conn, min_peers):
-    return {r["publication_id"]: r for r in single_bid.lots(conn, "2026-01-01", "2026-12-31", min_peers)}
+def lots_by_pub(conn, min_peers, brackets=single_bid.DEFAULT_BRACKETS):
+    rows = single_bid.lots(conn, "2026-01-01", "2026-12-31", min_peers, brackets)
+    return {r["publication_id"]: r for r in rows}
 
 
 def test_expected_excludes_the_authority_and_falls_back(conn):
@@ -79,3 +92,17 @@ def test_expected_excludes_the_authority_and_falls_back(conn):
     assert (b["peer_level"], float(b["expected"])) == ("canton", 1.0)
     r = lots_by_pub(conn, min_peers=5)           # Geneva group too small: the country, without A
     assert (r["a0"]["peer_level"], float(r["a0"]["expected"])) == ("country", 0.125)
+
+
+def test_brackets_set_the_comparison_group(conn):
+    with conn.cursor() as cur:
+        add(cur, "a0", "pa0", "A", "GE", 1, price=100000)
+        add(cur, "b0", "pb0", "B", "GE", 1, price=100000)      # same bracket as a0 by default
+        add(cur, "b1", "pb1", "B", "GE", 3, price=200000)
+        add(cur, "b2", "pb2", "B", "GE", 3, price=2000000)
+    r = lots_by_pub(conn, min_peers=1)                         # < 250k: b0, b1 → 1/2
+    assert (r["a0"]["bracket"], float(r["a0"]["expected"])) == ("<250k", 0.5)
+    r = lots_by_pub(conn, min_peers=1, brackets=(150_000,))    # < 150k: b0 → 1/1
+    assert (r["a0"]["bracket"], float(r["a0"]["expected"])) == ("<150k", 1.0)
+    r = lots_by_pub(conn, min_peers=1, brackets=())            # price ignored: 1/3
+    assert (r["a0"]["bracket"], float(r["a0"]["expected"])) == ("any", pytest.approx(1 / 3))

@@ -10,6 +10,7 @@
     tenderwatch ranking --by-canton        # one row per canton
     tenderwatch single-bid                 # risk indicator, by contracting authority
     tenderwatch single-bid --authority <proc_office_id>   # its lots, one by one
+    tenderwatch single-bid --brackets 100k,500k,2M        # other price brackets
 """
 from __future__ import annotations
 
@@ -57,6 +58,8 @@ def main(argv=None):
     s.add_argument("--to", dest="date_to", default=dt.date.today().isoformat())
     s.add_argument("--min-projects", type=int, default=10, help="minimum projects to test an authority")
     s.add_argument("--min-peers", type=int, default=50, help="minimum projects in a comparison group")
+    s.add_argument("--brackets", type=single_bid.parse_brackets, default=single_bid.DEFAULT_BRACKETS,
+                   help="price bracket bounds in CHF, e.g. 250k,1M,5M (default); 'none' ignores the price")
     s.add_argument("--canton", type=str.upper, help="only show authorities of this canton (CH = federal)")
     s.add_argument("--top", type=int, default=50)
     s.add_argument("--csv", help="write every tested authority to this CSV file")
@@ -110,7 +113,7 @@ def main(argv=None):
         else:
             print(ranking.to_markdown(quality, rows, args.date_from, args.date_to, args.order, args.canton))
     elif args.command == "single-bid":
-        lots = single_bid.lots(conn, args.date_from, args.date_to, args.min_peers)
+        lots = single_bid.lots(conn, args.date_from, args.date_to, args.min_peers, args.brackets)
         if args.authority:
             out = single_bid.detail_markdown(lots, args.authority)
             if out is None:

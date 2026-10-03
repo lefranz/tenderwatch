@@ -45,7 +45,7 @@ blanks, because very few plants in the world make them.
 | **Observation** | a lot awarded after competition (`pub_type = 'award'`); direct awards are excluded, nobody else could bid |
 | **Single bid** | `decision.numberOfSubmissions = 1` |
 | **Weight** | 1 / (awarded lots of the project): a project weighs 1 |
-| **Comparison group** | same type (`orderType`), same procedure family (open, or invitation/selective), same bracket of published price (< 250k, 250k–1M, 1–5M, ≥ 5M, unknown), same canton of the authority (CH = federal) |
+| **Comparison group** | same type (`orderType`), same procedure family (open, or invitation/selective), same bracket of published price (< 250k, 250k–1M, 1–5M, ≥ 5M, unknown; `--brackets`), same canton of the authority (CH = federal) |
 | **Fallback** | a group of fewer than 50 projects (`--min-peers`) → whole country, then type × procedure |
 | **Self-exclusion** | the authority tested is removed from its own group |
 | **Authorities tested** | at least 10 projects (`--min-projects`) |
@@ -74,7 +74,7 @@ blanks, because very few plants in the world make them.
 |---|---|---|---|
 | 1 | Unit tests | ✅ 1 Oct 2026 | binomial tail, BH, lot weights, threshold, self-exclusion, fallback |
 | 2 | Reading the flagged files | 🟡 2 of 7 | one worth investigating (brand-tied maintenance renewals), one legitimate niche |
-| 3 | Sensitivity to settings | 🟡 group and authority thresholds | stable core of 6; brackets not varied yet |
+| 3 | Sensitivity to settings | ✅ 3 Oct 2026 | group and authority thresholds: stable core of 5–6; price brackets: the 7 flagged stay flagged in all 6 settings |
 | 4 | Stability over time | ✅ 1 Oct 2026 | unstable: see log |
 | 5 | Calibration | ⬜ | no known case within the data window (from July 2024) |
 
@@ -99,3 +99,28 @@ blanks, because very few plants in the world make them.
 - **Fixed along the way**: the authority name first came from the
   publication's contact address, sometimes that of the mandated architects.
   It now comes from `proc_offices`.
+
+### 3 October 2026 — price brackets varied
+
+`tenderwatch single-bid --brackets …`, same period and data as the first run
+(1 July 2024 → 1 October 2026, 19,499 lots, 357 authorities tested), every
+other setting at its default. Closes test 3: group and authority thresholds
+were varied on 1 October, brackets were not.
+
+| Brackets (CHF) | Lots compared within the canton | q < 0.05 | q < 0.10 | of the 7 flagged by default, still q < 0.05 |
+|---|---|---|---|---|
+| 250k, 1M, 5M (default) | 13,537 | 7 | 9 | 7 |
+| none (price ignored) | 18,247 | 7 | 13 | 7 |
+| 1M | 15,478 | 9 | 10 | 7 |
+| 100k, 500k, 2M | 13,396 | 9 | 10 | 7 |
+| 500k, 2M, 10M | 13,791 | 8 | 10 | 7 |
+| 150k, 350k, 1M, 5M, 10M | 12,440 | 7 | 8 | 7 |
+
+- **The signal does not depend on the brackets**: the 7 authorities flagged
+  by default stay flagged in every setting, even with the price ignored.
+- Two more authorities (a municipal department, a municipal utility) are
+  flagged under some brackets only: borderline cases, not part of the core.
+- Finer brackets push more lots to the country-wide fallback (groups under
+  50 projects), coarser ones keep them in their canton: the flagged set
+  barely moves either way.
+

@@ -12,7 +12,8 @@ project): a project weighs 1, a framework agreement in 8 lots does not count 8.
 Expected: for each lot, the single-bid rate of similar contracts awarded by
 OTHER authorities over the same period. Similar = same type (works, services,
 supplies), same procedure family (open, or invitation/selective), same bracket
-of published price and same canton of the authority (CH = federal). A group of
+of published price (`brackets`, default < 250k, 250k–1M, 1–5M, ≥ 5M, unknown)
+and same canton of the authority (CH = federal). A group of
 fewer than `min_peers` projects falls back on the whole country, then on type ×
 procedure alone.
 
@@ -58,11 +59,7 @@ WITH lot AS (
 l AS (
     SELECT *, 1.0 / count(*) OVER (PARTITION BY project_id) AS weight,
            (n_submissions = 1)::int                         AS single,
-           CASE WHEN price IS NULL THEN 'unknown'
-                WHEN price < 250000 THEN '<250k'
-                WHEN price < 1000000 THEN '250k-1M'
-                WHEN price < 5000000 THEN '1M-5M'
-                ELSE '>=5M' END                             AS bracket
+           {bracket}                                        AS bracket
     FROM lot
 ),
 w AS (
@@ -94,16 +91,52 @@ FROM w
 ORDER BY proc_office_id, publication_date, project_number
 """
 
+DEFAULT_BRACKETS = (250_000, 1_000_000, 5_000_000)
+UNITS = {"k": 1_000, "M": 1_000_000}
+
+
+def parse_brackets(text: str) -> tuple[int, ...]:
+    """"250k,1M,5M" → (250000, 1000000, 5000000); "none" → () : price not used."""
+    if text.strip().lower() == "none":
+        return ()
+    bounds = []
+    for t in text.split(","):
+        t = t.strip()
+        bounds.append(int(float(t[:-1]) * UNITS[t[-1]]) if t[-1:] in UNITS else int(t))
+    if any(b <= 0 for b in bounds) or bounds != sorted(set(bounds)):
+        raise ValueError(f"brackets must be positive and increasing: {text}")
+    return tuple(bounds)
+
+
+def _label(v: int) -> str:
+    for unit, n in (("M", 1_000_000), ("k", 1_000)):
+        if v >= n and v % (n // 10) == 0:
+            return f"{v / n:g}{unit}"
+    return str(v)
+
+
+def bracket_case(bounds: tuple[int, ...]) -> str:
+    """SQL expression giving the price bracket of `price`. Bounds are ints, safe to inline."""
+    if not bounds:
+        return "'any'"
+    bounds = [int(b) for b in bounds]
+    whens = [f"WHEN price < {bounds[0]} THEN '<{_label(bounds[0])}'"]
+    whens += [f"WHEN price < {hi} THEN '{_label(lo)}-{_label(hi)}'" for lo, hi in zip(bounds, bounds[1:])]
+    return ("CASE WHEN price IS NULL THEN 'unknown' " + " ".join(whens)
+            + f" ELSE '>={_label(bounds[-1])}' END")
+
+
 COLUMNS = ["authority", "jurisdiction", "projects", "lots", "single_bid", "expected", "ratio", "p", "q",
            "top_winner", "top_winner_lots"]
 LOT_COLUMNS = ["publication_date", "project_number", "title", "order_type", "procedure", "bracket",
                "n_submissions", "winner_name", "expected", "peer_level"]
 
 
-def lots(conn, date_from: str, date_to: str, min_peers: int = 50) -> list[dict]:
+def lots(conn, date_from: str, date_to: str, min_peers: int = 50,
+         brackets: tuple[int, ...] = DEFAULT_BRACKETS) -> list[dict]:
     """→ one dict per lot awarded after competition, with its expected single-bid rate."""
     with conn.cursor() as cur:
-        cur.execute(LOTS, {"from": date_from, "to": date_to, "min_peers": min_peers})
+        cur.execute(LOTS.replace("{bracket}", bracket_case(brackets)), {"from": date_from, "to": date_to, "min_peers": min_peers})
         names = [d[0] for d in cur.description]
         return [dict(zip(names, r)) for r in cur.fetchall()]
 
