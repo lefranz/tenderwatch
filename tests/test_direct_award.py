@@ -112,3 +112,15 @@ def test_grounds_by_lot_and_by_authority(conn):
     line = direct_award._grounds_line(list(r.values()))        # above the first bracket only
     assert ("4 · art. 21 para. 2 letter cited by 2 (50%): c 2 · e 1 · no letter recognised 1 · "
             "no justification 1\n") in line
+
+
+def test_a_direct_award_under_a_competitive_procedure_counts_as_competitive(conn):
+    with conn.cursor() as cur:
+        add(cur, "a0", "pa0", "A", "GE", True)
+        cur.execute("UPDATE v_awards_current SET process_type = 'invitation' WHERE publication_id = 'a0'")
+        add(cur, "b0", "pb0", "B", "GE", True)
+    r = lots_by_pub(conn, min_peers=1)
+    assert (r["a0"]["direct"], r["a0"]["mistyped"], r["a0"]["ground"]) == (0, 1, None)
+    assert (r["b0"]["direct"], r["b0"]["mistyped"]) == (1, 0)
+    assert float(r["b0"]["expected"]) == 0.0          # A's lot is a competitive peer
+    assert "counted as competitive: 1" in direct_award._grounds_line(list(r.values()))

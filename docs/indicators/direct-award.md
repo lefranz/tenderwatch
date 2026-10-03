@@ -36,7 +36,8 @@ state its legal ground.
 | | |
 |---|---|
 | **Observation** | an awarded lot (`pub_type` `award` or `direct_award`), latest version (`v_awards_current`) |
-| **Flag** | `pub_type = 'direct_award'` |
+| **Flag** | `pub_type = 'direct_award'` **and** `processType = 'direct'` (since 3 Oct 2026, test 2) |
+| **Mistyped** | a `direct_award` under an open, selective or invitation procedure: a tender award published under the wrong type, counted as competitive |
 | **Weight** | 1 / (awarded lots of the project): a project weighs 1 |
 | **Comparison group** | same type (`orderType`), same bracket of published price (< 150k, 150k–1M, 1–5M, ≥ 5M, unknown; `--brackets`), same canton of the authority (CH = federal) |
 | **Why 150k** | the direct-award thresholds: CHF 150,000 for federal supplies and services, 100,000–150,000 for cantonal supplies and services, 150,000–300,000 for works. Below them, a direct award is the ordinary procedure and needs no ground |
@@ -92,6 +93,17 @@ award above the thresholds without saying why.
   brand-tied imaging equipment is compared with municipalities building
   roads. Hospitals, universities and utilities are therefore expected near the
   top; the files say whether their grounds hold.
+- **Mistyped publications.** 19 % of the publications typed `direct_award`
+  carry a competitive procedure; their justifications describe an evaluation
+  of bids, and 15 out of 1,124 cite a ground of art. 21. They are counted as
+  competitive since 3 October 2026, which loses those 15 genuine direct
+  awards. Some authorities publish invitation procedures this way as a
+  matter of course.
+- **Amounts are not frequencies.** The indicator counts direct awards; it
+  does not see a few very large ones. Extending an exhausted framework
+  agreement by direct award until the next tender (letter e) can move
+  hundreds of millions with an ordinary rate. That needs an indicator of its
+  own.
 - **In-house awards** (an authority awarding to an entity it controls) are
   sometimes published as direct awards, though outside procurement law.
 - **The published price sets the bracket**, with the same caveats as for single
@@ -103,9 +115,9 @@ award above the thresholds without saying why.
 | # | Test | State | Result |
 |---|---|---|---|
 | 1 | Unit tests | ✅ 3 Oct 2026 | self-exclusion, fallback, type and bracket groups, lot weights |
-| 2 | Reading the flagged files | ⬜ | |
-| 3 | Sensitivity to settings | ✅ 3 Oct 2026 | 38 of the 56 flagged stay at q < 0.10 in all six settings |
-| 4 | Stability over time | ✅ 3 Oct 2026 | 8 authorities flagged on both halves |
+| 2 | Reading the flagged files | ✅ 3 Oct 2026 | 11 read: 3 worth investigating, 5 legitimate, 3 artefacts; one artefact corrected in the method (mistyped publications) |
+| 3 | Sensitivity to settings | ✅ 3 Oct 2026, re-run | after the correction: 30 of the 47 flagged stay at q < 0.10 in all six settings |
+| 4 | Stability over time | ✅ 3 Oct 2026, re-run | after the correction: 12 authorities flagged on both halves |
 | 5 | Calibration | ⬜ | |
 
 ## Log
@@ -160,4 +172,41 @@ Same command and data. 4,264 direct-award lots above the first bracket
 - Checked by hand on samples: two-letter citations and repeated citations are
   read correctly; the unrecognised ones are paraphrases, citations of
   para. 2 without a letter, the Geneva regulation, or para. 1 cited in error.
+
+### 3 October 2026 — test 2: reading the flagged files, method corrected
+
+Read lot by lot (title, amount, winner, ground cited, justification) for the
+five authorities at the top of the list and the six others flagged on both
+halves of the period: 11 authorities, 556 direct awards. Each sorted as
+the protocol asks:
+
+| Verdict | Authorities | What the files show |
+|---|---|---|
+| worth investigating | 3 | IT consultants hired under « single supplier » with a one-line boilerplate ground; multi-million awards without any legal ground; framework agreements whose ceiling was « reached early », extended by direct award until the next tender |
+| legitimate explanation | 5 | subscriptions and licences bought from their publisher; brand-tied medical equipment, with grounds stated and failed tenders (letter a); amendments to a large road project; extension of earlier works contracts; software maintenance by its publisher |
+| artefact | 3 | tender awards published as direct awards; invitation procedures published as direct awards; one building site's small trade lots published voluntarily |
+
+**The artefact is systematic, not local.** Six of the eleven authorities
+publish some tender awards as `direct_award`, with justifications such as
+« beste Erfüllung der Zuschlagskriterien » or « l'offre a remporté le plus
+de points ». Measured on all the data: **1,124 of the 5,774 direct-award
+publications (19 %) carry an open (534), invitation (425) or selective
+(165) procedure**, and only 15 of them cite a ground of art. 21. The flag
+now requires the `direct` procedure; the mistyped ones count as awards after
+competition. The earlier entries of this log counted them as direct awards.
+
+Re-run after the correction (same command, data and period):
+
+- **4,650 direct awards, 20.8 % of projects** (was 25.9 %).
+- Above the first bracket: 3,562 direct awards; letter cited **59 %** (was
+  50 %), no letter recognised 30 %, **no justification 10 %** (was 15 %):
+  the mistyped publications were a large share of the missing grounds.
+- **47 flagged** (was 56), 61 at q < 0.10. Of the 11 read, 3 are no longer
+  flagged: the one made only of mistyped tenders, one whose « direct awards »
+  were mostly invitation procedures, and one whose remaining rate is close
+  to its peers' (q = 0.10). The lead found in the last one's files (exhausted framework ceilings) does not depend on the
+  rate: see the limit « amounts are not frequencies ».
+- Sensitivity: **30** of the 47 stay at q < 0.10 in all six settings.
+  Stability: **12** flagged on both halves.
+- Status: preliminary. Tests 1 to 4 done; test 5 (calibration) open.
 

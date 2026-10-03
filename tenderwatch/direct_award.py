@@ -6,8 +6,16 @@ It scores the contracting authority, not the winner. Plain-language explanation
 and evaluation: docs/indicators/direct-award.md.
 
 Observation: every awarded lot (`award` or `direct_award`). Flag: the lot was
-awarded directly, without competition. Each lot weighs 1/(awarded lots of its
-project).
+awarded directly, without competition: published as `direct_award` WITH the
+`direct` procedure. Each lot weighs 1/(awarded lots of its project).
+
+A `direct_award` publication whose procedure is open, selective or by
+invitation (19 % of them, measured on 3 October 2026) is almost always a
+tender award published under the wrong type: its justification describes
+the evaluation of several bids ("beste Erfüllung der Zuschlagskriterien",
+"l'offre a remporté le plus de points"), and 15 out of 1,124 cite a ground of
+art. 21. It counts as an award after competition (`mistyped` = 1). The cost:
+those 15 genuine direct awards are lost.
 
 Expected: for each lot, the share of direct awards among similar contracts
 awarded by OTHER authorities over the same period. Similar = same type (works,
@@ -98,7 +106,10 @@ WITH lot AS (
            max(jurisdiction)                                AS jurisdiction,
            COALESCE(max(order_type), 'unknown')             AS order_type,
            max(process_type)                                AS process_type,
-           (max(pub_type) = 'direct_award')::int            AS direct,
+           -- a direct award published with a competitive procedure is almost
+           -- always a tender award under the wrong type (see the module docstring)
+           (max(pub_type) = 'direct_award' AND COALESCE(max(process_type), 'direct') = 'direct')::int AS direct,
+           (max(pub_type) = 'direct_award' AND COALESCE(max(process_type), 'direct') <> 'direct')::int AS mistyped,
            max(justification)                               AS justification,
            max(price) FILTER (WHERE currency = 'chf')       AS price,
            min(COALESCE(uid, 'simap:' || vendor_id::text))  AS winner,
@@ -131,7 +142,7 @@ w AS (
            g3a AS (PARTITION BY order_type, proc_office_id)
 )
 SELECT publication_id, project_id, proc_office_id, project_number, publication_date, title,
-       authority, jurisdiction, order_type, process_type, bracket, price, direct, justification,
+       authority, jurisdiction, order_type, process_type, bracket, price, direct, mistyped, justification,
        winner, winner_name, weight,
        CASE WHEN jurisdiction IS NOT NULL AND n1 >= %(min_peers)s THEN s1 / n1
             WHEN n2 >= %(min_peers)s THEN s2 / n2
@@ -214,7 +225,9 @@ def _grounds_line(lot_rows) -> str:
     counts = _ground_counts(above)
     cited = len(above) - counts["other"] - counts["empty"]
     letters = " · ".join(f"{g} {k}" for g, k in counts.most_common() if g not in UNCITED)
-    return (f"Direct awards above the first bracket: {len(above)} · art. 21 para. 2 letter cited by {cited} "
+    mistyped = sum(r["mistyped"] for r in lot_rows)
+    return (f"Published as direct awards under a competitive procedure, counted as competitive: {mistyped}\n\n"
+            f"Direct awards above the first bracket: {len(above)} · art. 21 para. 2 letter cited by {cited} "
             f"({cited / len(above):.0%}): {letters} · no letter recognised {counts['other']} · "
             f"no justification {counts['empty']}\n")
 
